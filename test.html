@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Song Search</title>
+</head>
+<body>
+    <h1>Song Search</h1>
+    <input type="text" id="songInput" placeholder="Enter a song name">
+    <button id="searchButton">Search</button>
+    <div id="result"></div>
+    <div id="youtubePlayer"></div>
+    
+
+    <script>
+        const rapidApiKey = 'qzKAGAUYlVmshZilV1Q4A73IzBpSp1c6ldNjsn5epQjw7duKiR'; // Replace with your RapidAPI key
+        const youtubeApiKey = 'AIzaSyAEABWuIAofSQUFvNocoAgBJ6f9iNQvXjI'; // Replace with your YouTube API key
+        let player;
+
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const songName = document.getElementById('songInput').value;
+            searchSongOnSpotify(songName)
+                .then(songInfo => {
+                    if (songInfo) {
+                        const resultElement = document.getElementById('result');
+                        resultElement.innerHTML = `<p>Found song on Spotify: ${songInfo.trackName} by ${songInfo.artistName}</p>`;
+                        return searchRelatedVideosOnYouTube(songInfo);
+                    } else {
+                        console.log('Song not found on Spotify');
+                    }
+                })
+                .then(videos => {
+                    if (videos) {
+                        const resultElement = document.getElementById('result');
+                        resultElement.innerHTML += '<p>Related YouTube videos:</p>';
+                        videos.forEach(video => {
+                            resultElement.innerHTML += `<p>- ${video.title} (Video ID: ${video.videoId})</p>`;
+                        });
+                        if (videos.length > 0) {
+                            // Embed the YouTube player with the first video
+                            embedYouTubePlayer(videos[0].videoId);
+                        }
+                    }
+                });
+        });
+
+     function embedYouTubePlayer(videoId) {
+    const youtubePlayerElement = document.getElementById('youtubePlayer');
+    youtubePlayerElement.innerHTML = `
+        <iframe
+            width="640"
+            height="360"
+            src="https://www.youtube.com/embed/${videoId}"
+            frameborder="0"
+            allowfullscreen
+            origin-when-cross-origin
+            gesture="media" 
+            allow="encrypted-media"
+        ></iframe>
+        <p><a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">Watch on YouTube</a></p>
+    `;
+}
+
+ function createYouTubePlayer(videoId) {
+    player = new YT.Player('youtubePlayer', {
+        height: '360',
+        width: '640',
+        videoId: videoId,
+        playerVars: {
+            'controls': 1,
+            'rel': 0,
+            'showinfo': 0,
+        },
+        events: {
+            'onReady': onPlayerReady,
+        }
+    });
+}
+
+
+        function onPlayerReady(event) {
+            event.target.playVideo();
+        }
+
+        async function searchSongOnSpotify(songName) {
+            try {
+                const response = await fetch(`https://spotify23.p.rapidapi.com/search/?q=${encodeURIComponent(songName)}&type=multi&offset=0&limit=10&numberOfTopResults=5`, {
+                    headers: {
+                        'x-rapidapi-host': 'spotify23.p.rapidapi.com',
+                        'x-rapidapi-key': rapidApiKey,
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.tracks && data.tracks.items && data.tracks.items.length > 0) {
+                    const firstTrack = data.tracks.items[0].data;
+                    const trackName = firstTrack.name;
+                    const artistName = firstTrack.artists.items[0].profile.name;
+                    return { trackName, artistName };
+                } else {
+                    console.log('Song not found on Spotify');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error searching for song on Spotify:', error);
+                return null;
+            }
+        }
+
+        async function searchRelatedVideosOnYouTube(songInfo) {
+            try {
+                const response = await fetch(`https://www.googleapis.com/youtube/v3/search?key=${youtubeApiKey}&q=${encodeURIComponent(songInfo.trackName + ' ' + songInfo.artistName)}&part=snippet&type=video&maxResults=5`);
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    const videos = data.items.map(item => ({
+                        title: item.snippet.title,
+                        videoId: item.id.videoId,
+                    }));
+                    return videos;
+                } else {
+                    console.log('No related YouTube videos found');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error searching for related videos on YouTube:', error);
+                return null;
+            }
+        }
+    </script>
+</body>
+</html>
